@@ -23,7 +23,7 @@ public:
                                  {180, 179, 150},
                                  {168, 154, 139},
                                  {122, 103, 79},
-                                 {255, 255, 255}
+                                 {255, 255, 254}
                                  });
                 land_grad.setInterpolationMethod(land_interp_meth, -1);
                 land_grad.setInterpolationMethod(hm::none, 7);
