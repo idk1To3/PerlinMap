@@ -1,0 +1,6 @@
+*.swp
+*.exe
+bin/
+*.png
+*.jpg
+*.bat
