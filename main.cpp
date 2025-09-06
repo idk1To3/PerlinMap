@@ -9,9 +9,40 @@
 
 enum win_ids
 {
+        controls_window,
         perlin_window,
         slice_window,
         info_window
+};
+
+class Controls : public PGEws::Window
+{
+public:
+	Controls(olc::PixelGameEngine* pge, unsigned int id, std::string name, int posX, int posY, int width, int height, int permissions = -1) : Window(pge, id, name, posX, posY, width, height, permissions){}
+
+        bool wOnUserCreate() override
+        {
+		return true;
+        }
+
+        bool wOnUserUpdate(float fElapsedTime) override
+        {
+                pge->DrawString(0,8,
+                        "Z to set the zoom back to 1.0\n\n"
+                        "C to center the map\n\n"
+                        "A to increase the angle offsets for each octave\n\n"
+                        "R to increase the amplitude ratio\n\n"
+                        "W to increase the water level\n\n"
+                        "S to toggle changing slice limits\n\n"
+                        "S + CTRL to get the seed of this map\n\n"
+                        "UP to increase the number of octaves (up to 10)\n\n"
+                        "DOWN to decrease the number of octaves\n\n"
+                        "Space to generate a new map with a new seed\n\n"
+                        "F12 to save the current map\n\n"
+                        "For A, R and W you can use shift for decreasing\n\n");
+
+                return true;
+        }
 };
 
 class PerlinMap : public PGEws::Window
@@ -624,6 +655,7 @@ public:
 public:
 	bool OnUserCreate() override
 	{
+                win.addNewWindow(new Controls(this, controls_window, "Controls", 15, 10, 450, 200));
                 win.addNewWindow(new PerlinMap(this, perlin_window, "Perlin map", 15, 10, 150, 150, ~(PGEws::CanClose)));
                 win.addNewWindow(new Slice(this, slice_window, "Slice of terrain", 180, 10, 400, 150, ~(PGEws::CanClose)));
                 win.addNewWindow(new Info(this, info_window, "Map info", 15, 180, 565, 50));
