@@ -995,6 +995,11 @@ namespace olc
                 bool AnyKeyHeld() const;
                 bool AnyKeyPressed() const;
                 bool AnyKeyReleased() const;
+                // Returns true if there is at least one part of the mouse held, pressed or released
+                // Custom by 1To3
+                bool AnyMouseHeld() const;
+                bool AnyMousePressed() const;
+                bool AnyMouseReleased() const;
 		// Get the state of a specific keyboard button
 		HWButton GetKey(Key k) const;
 		// Get the state of a specific mouse button
@@ -1286,6 +1291,11 @@ namespace olc
                 bool            pAnyKeyHeld = false;
                 bool            pAnyKeyPressed = false;
                 bool            pAnyKeyReleased = false;
+
+                // Custom by 1To3
+                bool            pAnyMouseHeld = false;
+                bool            pAnyMousePressed = false;
+                bool            pAnyMouseReleased = false;
 
 		// State of mouse
 		bool		pMouseNewState[nMouseButtons] = { 0 };
@@ -2127,6 +2137,16 @@ namespace olc
 
         bool PixelGameEngine::AnyKeyReleased() const
         { return pAnyKeyReleased; }
+
+        // Custom by 1To3
+        bool PixelGameEngine::AnyMouseHeld() const
+        { return pAnyMouseHeld; }
+
+        bool PixelGameEngine::AnyMousePressed() const
+        { return pAnyMousePressed; }
+
+        bool PixelGameEngine::AnyMouseReleased() const
+        { return pAnyMouseReleased; }
 
 
 	HWButton PixelGameEngine::GetKey(Key k) const
@@ -3925,8 +3945,42 @@ namespace olc
 				pStateOld[i] = pStateNew[i];
 			}
 		};
+
+		auto ScanHardwareMouse = [&](HWButton* pKeys, bool* pStateOld, bool* pStateNew, uint32_t nKeyCount)
+		{
+                        pAnyMouseHeld = false;
+                        pAnyMousePressed = false;
+                        pAnyMouseReleased = false;
+			for (uint32_t i = 0; i < nKeyCount; i++)
+			{
+				pKeys[i].bPressed = false;
+				pKeys[i].bReleased = false;
+				if (pStateNew[i] != pStateOld[i])
+				{
+					if (pStateNew[i])
+					{
+						pKeys[i].bPressed = !pKeys[i].bHeld;
+
+                                                pAnyMousePressed |= pKeys[i].bPressed;
+
+						pKeys[i].bHeld = true;
+
+                                                pAnyMouseHeld = true;
+					}
+					else
+					{
+						pKeys[i].bReleased = true;
+						pKeys[i].bHeld = false;
+
+                                                pAnyMouseReleased = true;
+					}
+				}
+				pStateOld[i] = pStateNew[i];
+			}
+		};
+
 		ScanHardwareKeys(pKeyboardState, pKeyOldState, pKeyNewState, 256);
-		ScanHardware(pMouseState, pMouseOldState, pMouseNewState, nMouseButtons);
+		ScanHardwareMouse(pMouseState, pMouseOldState, pMouseNewState, nMouseButtons);
 
 		// Cache mouse coordinates so they remain consistent during frame
 		vMousePos = vMousePosCache;

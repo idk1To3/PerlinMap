@@ -1,15 +1,23 @@
 #define OLC_IMAGE_STB
 #define OLC_PGE_APPLICATION
 #include "olcPixelGameEngine.h"
+#define PGEWS_APPLICATION
 #include "PGEwindowsim.h"
 #include "perlinOctave.h"
 #include "TransformedViewWindow.h"
 #include "HeightMap.h"
 
-class PerlinMap : public Window
+enum win_ids
+{
+        perlin_window,
+        slice_window,
+        info_window
+};
+
+class PerlinMap : public PGEws::Window
 {
 public:
-	PerlinMap(olc::PixelGameEngine* pge, unsigned int id, std::string name, int width, int height, int posX, int posY, int permissions = -1) : Window(pge, id, name, width, height, posX, posY, permissions)
+	PerlinMap(olc::PixelGameEngine* pge, unsigned int id, std::string name, int posX, int posY, int width, int height, int permissions = -1) : Window(pge, id, name, posX, posY, width, height, permissions)
 	{ 
                 land_interp_meth = hm::linear;
                 water_interp_meth = hm::linear;
@@ -25,7 +33,6 @@ public:
                                  {255, 255, 255}
                                  });
                 land_grad.setInterpolationMethod(land_interp_meth, -1);
-                land_grad.setInterpolationMethod(hm::none, 7);
 
                 water_grad = hm::Gradient({-2.0f, -1.0f, -0.5f, 0.0f},
                                 {{0,0,0},
@@ -80,7 +87,7 @@ public:
 
                 std::cout << "\n" << "seed: " << seed << "\n";
 
-		tvw.init(this);
+		tvw.init(this, 0.10f);
 
                 values.resize(WindowWidth() * WindowHeight());
 
@@ -227,6 +234,9 @@ public:
 private:
         bool sliceInput()
         {
+                if(isResizing())
+                        return false;
+
                 bool recalculate = false;
                 olc::vi2d mousePos = lGetMousePos();
                 if(mousePos.x < 0)
@@ -254,6 +264,9 @@ private:
 
         bool userInput()
         {
+                if(isResizing())
+                        return false;
+
                 if(!pge->AnyKeyPressed())
                         return false;
 
@@ -402,28 +415,34 @@ public:
 
         bool wOnUserUpdate(float fElapsedTime) override
         {
-                if(isResizing)
-                        values.resize(WindowWidth()*WindowHeight());
+                bool recalculate = false;
 
-                if(!inFocus && !redrawSignal)
+                if(isResizing())
                 {
-                        return true;
+                        values.resize(WindowWidth()*WindowHeight());
+                        recalculate = true;
                 }
-
-                bool recalculate = isResizing;
-
-                if(changingSliceLimits && !pge->GetKey(olc::Key::SHIFT).bHeld)
-                        recalculate |= sliceInput();
-                else
-                        recalculate |= tvw.handlePanning();
-
-                recalculate |= tvw.handleZooming();
 
                 recalculate |= userInput();
 
-                recalculate |= redrawSignal;
+                if(!redrawSignal)
+                {
+                        if(!isInFocus() && !recalculate)
+                        {
+                                return true;
+                        }
 
-                if(recalculate)
+                        if(changingSliceLimits && !pge->GetKey(olc::Key::SHIFT).bHeld)
+                                recalculate |= sliceInput();
+                        else
+                                recalculate |= tvw.handlePanning();
+
+                        recalculate |= tvw.handleZooming();
+                }
+
+                recalculate |= isResizing();
+
+                if(recalculate || redrawSignal)
                 {
                         recalculateAndDraw();
                         if(changingSliceLimits)
@@ -436,20 +455,13 @@ public:
         }
 };
 
-class Info : public Window
+class Info : public PGEws::Window
 {
 public:
-	Info(olc::PixelGameEngine* pge, unsigned int id, std::string name, int width, int height, int posX, int posY, int permissions = -1) : Window(pge, id, name, width, height, posX, posY, permissions)
+	Info(olc::PixelGameEngine* pge, unsigned int id, std::string name, int posX, int posY, int width, int height, int permissions = -1) : Window(pge, id, name, posX, posY, width, height, permissions)
         { }
 
-        void setPerlinMapPtr(PerlinMap* perlin_map)
-        {
-                this->perlin_map = perlin_map;
-        }
-
 private:
-
-        PerlinMap* perlin_map;
 
         int scale;
 
@@ -461,6 +473,8 @@ public:
 
         bool wOnUserUpdate(float fElapsedTime) override
         {
+                PerlinMap* perlin_map = (PerlinMap*)getWindow(perlin_window);
+
                 pge->Clear(olc::BLACK);
 
                 int x = perlin_map->lGetMouseX();
@@ -472,7 +486,7 @@ public:
 
                 pge->DrawString(0, 40, "Water level: " + std::to_string(perlin_map->getWaterLevel()));
 
-                if(!perlin_map->inFocus || !perlin_map->lMouseInBounds())
+                if(!perlin_map->isInFocus() || !perlin_map->lMouseInBounds())
                         return true;
 
                 pge->DrawString(0,10,"Height: " + std::to_string(perlin_map->getFromValuesArray(x, y)));
@@ -485,27 +499,22 @@ public:
 
 };
 
-class Slice : public Window
+class Slice : public PGEws::Window
 {
 
 public:
-	Slice(olc::PixelGameEngine* pge, unsigned int id, std::string name, int width, int height, int posX, int posY, int permissions = -1) : Window(pge, id, name, width, height, posX, posY, permissions)
+	Slice(olc::PixelGameEngine* pge, unsigned int id, std::string name, int posX, int posY, int width, int height, int permissions = -1) : Window(pge, id, name, posX, posY, width, height, permissions)
 	{ }
 
-        void setPerlinMapPtr(PerlinMap* perlin_map)
-        {
-                this->perlin_map = perlin_map;
-        }
-
 private:
-        PerlinMap* perlin_map;
-
         int inputY = 0;
 
         int infoX = -1;
 
         void Draw()
         {
+                PerlinMap* perlin_map = (PerlinMap*)getWindow(perlin_window);
+
                 pge->Clear(olc::WHITE);
 
                 float fWL = perlin_map->getWaterLevel();
@@ -556,19 +565,38 @@ public:
                 return true;
         }
 
+        bool clickedToGainFocus = false; //If the user has left clicked on the window with the purpose
+                                         //of gaining focus, then we shouldn't accept input for the window
+                                         //until the mouse is released
+
         bool wOnUserUpdate(float fElapsedTime) override
         {
                 Draw();
 
-                if(!inFocus)
+                if(!isInFocus())
                         return true;
 
                 if(!lMouseInBounds())
                         return true;
 
+                if(isResizing())
+                        return true;
+
+                if(hasGainedFocus())
+                        clickedToGainFocus = true;
+
+                if(clickedToGainFocus)
+                {
+                        if(pge->GetMouse(0).bReleased)
+                                clickedToGainFocus = false;
+                        else
+                                return true;
+                }
+
                 if(pge->GetMouse(0).bHeld)
                 {
                         inputY = lGetMouseY();
+                        PerlinMap* perlin_map = (PerlinMap*)getWindow(perlin_window);
                         perlin_map->setWaterLevel(-(((float)inputY/WindowHeight()) * 2.0f - 1.0f));
                         perlin_map->needToRedraw();
                 }
@@ -591,25 +619,14 @@ public:
 		sAppName = "Perlin";
 	}
 
-        WindowList win;
-
-        enum win_ids
-        {
-                perlin_window,
-                slice_window,
-                info_window
-        };
+        PGEws::WindowList win;
 
 public:
 	bool OnUserCreate() override
 	{
-                win.addNewWindow(new PerlinMap(this, perlin_window, "Perlin map", 150, 150, 15, 10, ~(PGEws::CanClose)));
-                win.addNewWindow(new Slice(this, slice_window, "Slice of terrain", 400, 150, 180, 10, ~(PGEws::CanClose)));
-
-                win.addNewWindow(new Info(this, info_window, "Map info", 500, 60, 15, 180, ~(PGEws::CanClose)));
-                
-                dynamic_cast<Info*>(win.windowList[win.getIndexOfId(info_window)])->setPerlinMapPtr(dynamic_cast<PerlinMap*>(win.windowList[win.getIndexOfId(perlin_window)]));
-                dynamic_cast<Slice*>(win.windowList[win.getIndexOfId(slice_window)])->setPerlinMapPtr(dynamic_cast<PerlinMap*>(win.windowList[win.getIndexOfId(perlin_window)]));
+                win.addNewWindow(new PerlinMap(this, perlin_window, "Perlin map", 15, 10, 150, 150, ~(PGEws::CanClose)));
+                win.addNewWindow(new Slice(this, slice_window, "Slice of terrain", 180, 10, 400, 150, ~(PGEws::CanClose)));
+                win.addNewWindow(new Info(this, info_window, "Map info", 15, 180, 565, 50));
 
 		return true;
 	}
@@ -619,6 +636,20 @@ public:
                 Clear(olc::BLACK);
 
                 win.updateAll(fElapsedTime);
+
+                if(GetKey(olc::Key::I).bPressed)
+                {
+                        if(win.getIndexOfId(info_window) == -1)
+                        {
+                                win.addNewWindow(new Info(this, info_window, "Map info", 565, 50, 15, 180));
+                                
+                                win.changeFocusedWindow(info_window);
+                        }
+                        else
+                        {
+                                win.toggleHidden(info_window);
+                        }
+                }
 
 		return true;
 	}
