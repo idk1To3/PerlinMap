@@ -34,11 +34,12 @@ public:
                         "R to increase the amplitude ratio\n\n"
                         "W to increase the water level\n\n"
                         "S to toggle changing slice limits\n\n"
-                        "S + CTRL to get the seed of this map\n\n"
+                        "LMB and RMB for changing slice limits\n\n"
                         "UP to increase the number of octaves (up to 10)\n\n"
                         "DOWN to decrease the number of octaves\n\n"
                         "Space to generate a new map with a new seed\n\n"
-                        "F12 to save the current map\n\n"
+                        "I to toggle the map info window\n\n"
+                        "CTRL+I to toggle this window\n\n"
                         "For A, R and W you can use shift for decreasing\n\n");
 
                 return true;
@@ -444,7 +445,7 @@ private:
 
 public:
 
-        bool wOnUserUpdate(float fElapsedTime) override
+        bool wOnUserUpdate(float fElapsedTime) override //I know, kind of a mess
         {
                 bool recalculate = false;
 
@@ -463,12 +464,15 @@ public:
                                 return true;
                         }
 
+                        bool inBounds = lMouseInBounds();
+
                         if(changingSliceLimits && !pge->GetKey(olc::Key::SHIFT).bHeld)
                                 recalculate |= sliceInput();
-                        else
+                        else if(inBounds)
                                 recalculate |= tvw.handlePanning();
 
-                        recalculate |= tvw.handleZooming();
+                        if(inBounds)
+                                recalculate |= tvw.handleZooming();
                 }
 
                 recalculate |= isResizing();
@@ -655,7 +659,7 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-                win.addNewWindow(new Controls(this, controls_window, "Controls", 15, 10, 450, 200));
+                win.addNewWindow(new Controls(this, controls_window, "Controls", 15, 10, 450, 220));
                 win.addNewWindow(new PerlinMap(this, perlin_window, "Perlin map", 15, 10, 150, 150, ~(PGEws::CanClose)));
                 win.addNewWindow(new Slice(this, slice_window, "Slice of terrain", 180, 10, 400, 150, ~(PGEws::CanClose)));
                 win.addNewWindow(new Info(this, info_window, "Map info", 15, 180, 565, 50));
@@ -671,15 +675,31 @@ public:
 
                 if(GetKey(olc::Key::I).bPressed)
                 {
-                        if(win.getIndexOfId(info_window) == -1)
+                        if(GetKey(olc::Key::CTRL).bHeld)
                         {
-                                win.addNewWindow(new Info(this, info_window, "Map info", 565, 50, 15, 180));
-                                
-                                win.changeFocusedWindow(info_window);
+                                if(win.getIndexOfId(controls_window) == -1)
+                                {
+                                        win.addNewWindow(new Controls(this, controls_window, "Controls", 15, 10, 450, 220));
+                                        
+                                        win.changeFocusedWindow(controls_window);
+                                }
+                                else
+                                {
+                                        win.toggleHidden(controls_window);
+                                }
                         }
                         else
                         {
-                                win.toggleHidden(info_window);
+                                if(win.getIndexOfId(info_window) == -1)
+                                {
+                                        win.addNewWindow(new Info(this, info_window, "Map info", 15, 180, 565, 50));
+                                        
+                                        win.changeFocusedWindow(info_window);
+                                }
+                                else
+                                {
+                                        win.toggleHidden(info_window);
+                                }
                         }
                 }
 
